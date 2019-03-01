@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -766,15 +764,11 @@ func main() {
 	resuming = false
 	if cntntLength > 0 {
 		chunks = handleParts(cntntLength, 4)
-		err := loadOld()
-		fmt.Println(chunks)
-		fmt.Println(cntntLength)
 		if err != nil {
 			log.Fatal(err)
 		}
 		if response.Header.Get("Accept-Ranges") != "bytes" {
 			chunks = handleParts(cntntLength, 1)
-			err := loadOld()
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -897,46 +891,6 @@ func handleFileName(URL string, headerResult string) string {
 		}
 	}
 	return "untitled"
-}
-func loadOld() error {
-	var files []string
-	var chunkies []chunk
-	err := filepath.Walk("./", func(path string, info os.FileInfo, err error) error {
-		files = append(files, path)
-		return nil
-	})
-	if err != nil {
-		log.Fatal("Error reading directory", err)
-	}
-	if len(files) >= 1 {
-		for i := range files {
-			if strings.Contains(files[i], ".gost") {
-				file, err := os.Open(files[i])
-				if err != nil {
-					log.Fatal("Error opening state file :", err)
-				}
-				defer file.Close()
-				reader := bufio.NewReader(file)
-				dec := gob.NewDecoder(reader)
-				err = dec.Decode(&chunkies)
-				if err != nil {
-					log.Fatal("Error getting old data :", err)
-				}
-				if chunkies[0].FileName == handleFileName(link, contentDisposition) {
-					cntntLength = 0
-					resuming = true
-					chunks = chunkies
-					for j := range chunks {
-						chunks[j].StartByte = int(chunkies[j].Counter.Total)
-						cntntLength += (chunks[j].EndByte - chunks[j].StartByte)
-					}
-					break
-				}
-			}
-		}
-
-	}
-	return err
 }
 func streamToByte(stream io.Reader) []byte {
 	buf := new(bytes.Buffer)
